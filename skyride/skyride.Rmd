@@ -1,0 +1,186 @@
+This uses the heterogeneous skyride code from a nice [paper](http://arxiv.org/abs/1210.4908) by Julia Palacios and Vladimir Minin, which employs INLA to fit a skyride to a clock-like tree. I've cleaned the code a little, but it doesn't deal with repeated sample times or repeated coalescence intervals.
+
+As this is just a quick exploratory analysis, I cheat by adding in a small noise term to the branch lengths. For some reason, the ```180914_HPTN071_scC_rep1-n0005_SIMULATED``` scenario fails to converge with this approach; I'll continue to look into this. It'll be interesting to see how these results compare with the skyrides from BEAST. On first glance, however, there aren't too many differences between them.
+
+First, I load in a bunch of libraries.
+
+```{r}
+library(ape)
+library(INLA)
+library(magrittr)
+library(ggplot2)
+```
+
+The following are taken from Palacios and Minin.
+
+```{r}
+branching.sampling.times <- function(phy){
+  phy = new2old.phylo(phy)
+  if (class(phy) != "phylo")
+    stop("object \"phy\" is not of class \"phylo\"")
+  tmp <- as.numeric(phy$edge)
+  nb.tip <- max(tmp)
+  nb.node <- -min(tmp)
+  xx <- as.numeric(rep(NA, nb.tip + nb.node))
+  names(xx) <- as.character(c(-(1:nb.node), 1:nb.tip))
+  xx["-1"] <- 0
+  for (i in 2:length(xx)) {
+    nod <- names(xx[i])
+    ind <- which(phy$edge[, 2] == nod)
+    base <- phy$edge[ind, 1]
+    xx[i] <- xx[base] + phy$edge.length[ind]
+  }
+  depth <- max(xx)
+  branching.sampling.times <- depth - xx
+  return(branching.sampling.times)
+}
+```
+
+```{r}
+heterochronous.gp.stat <- function(phy){
+  b.s.times = branching.sampling.times(phy)
+  int.ind = which(as.numeric(names(b.s.times)) < 0)
+  tip.ind = which(as.numeric(names(b.s.times)) > 0)
+  num.tips = length(tip.ind)
+  num.coal.events = length(int.ind)
+  sampl.suf.stat = rep(NA, num.coal.events)
+  coal.interval = rep(NA, num.coal.events)
+  coal.lineages = rep(NA, num.coal.events)
+  sorted.coal.times = sort(b.s.times[int.ind])
+  names(sorted.coal.times) = NULL
+  #unique.sampling.times = sort(unique(b.s.times[tip.ind]))
+  sampling.times = sort((b.s.times[tip.ind]))
+  for (i in 2:length(sampling.times)){
+   if ((sampling.times[i]-sampling.times[i-1])<0.1){
+     sampling.times[i]<-sampling.times[i-1]}
+  }
+  unique.sampling.times<-unique(sampling.times)
+  sampled.lineages = NULL
+  for (sample.time in unique.sampling.times){
+   sampled.lineages = c(sampled.lineages,
+    sum(sampling.times == sample.time))  
+  }
+return(list(coal.times=sorted.coal.times, sample.times = unique.sampling.times, sampled.lineages=sampled.lineages))  
+}
+```
+
+```{r}
+calculate.heterochronous.skyride <- function(tree){
+  ##Data prep to use INLA
+  dd<-heterochronous.gp.stat(tree)
+  s.time<-dd$sample.times
+  n.sample<-dd$sampled.lineages
+  n<-length(dd$coal.times)+1
+  data<-matrix(0,nrow=n-1,ncol=2)
+  data[,1]<-dd$coal.times
+  s.time<-c(s.time,max(data[,1])+1)
+  data[1,2]<-sum(n.sample[s.time<=data[1,1]])
+  tt<-length(s.time[s.time<=data[1,1]])+1
+  for (j in 2:nrow(data)){
+    if (data[j,1]<s.time[tt]){
+  	  data[j,2]<-data[j-1,2]-1
+		}else{
+			data[j,2]<-data[j-1,2]-1+sum(n.sample[s.time>data[j-1,1] & s.time<=data[j,1]])
+		  tt<-length(s.time[s.time<=data[j,1]])+1
+		}	
+  }
+  ###Bayesian Skyride -CGGP
+  s<-unique(sort(c(data[,1],s.time[1:length(s.time)-1])))
+  event1<-sort(c(data[,1],s.time[1:length(s.time)-1]),index.return=TRUE)$ix
+  n<-nrow(data)+1
+  l<-length(s)
+  event<-rep(0,l)
+  event[event1<n]<-1
+  y<-diff(s)
+  coal.factor<-rep(0,l-1)
+  indicator<-rep(0,l-1)
+  t<-rep(0,l-1)
+  indicator<-cumsum(n.sample[s.time<data[1,1]])
+  indicator<-c(indicator,indicator[length(indicator)]-1)
+  ini<-length(indicator)+1
+  for (k in ini:(l-1)){
+    j<-data[data[,1]<s[k+1] & data[,1]>=s[k],2]
+    if (length(j)==0){indicator[k]=indicator[k-1]+sum(n.sample[s.time<s[k+1] & s.time>=s[k]])}
+    if (length(j)>0){indicator[k]<-j-1+sum(n.sample[s.time<s[k+1] & s.time>=s[k]])}
+  }
+  coal.factor<-indicator*(indicator-1)/2
+  coal.times<-data[,1]
+  u<-c(coal.times[1],diff(coal.times))
+  label<-c(1,1+cumsum(event[1:(l-1)]))
+  factor.matrix<-.5*diag(length(u))
+  for (j in 2:length(u)){
+    for (i in 1:(j-1)){
+      factor.matrix[j,i]<-1
+    }
+  }
+  time_aware_short<-factor.matrix%*%u
+  time_aware<-time_aware_short[label]
+  E <- y*coal.factor
+  formula=y~-1+f(time,model="rw1",hyper = list(prec = list(param = c(.001, .001))),constr=FALSE)
+  data_mod<-data.frame(y=event[-1],event=event[-1],time=time_aware[-1],E=log(E))
+  mod5<-inla(formula,family="poisson",data=data_mod,offset=E,control.predictor=list(compute=TRUE))
+  grid.points.scaled1<-dd$coal.times
+  sr.median <- exp(-mod5$summary.random$time$"0.5quant")
+  sr.lc <- exp(-mod5$summary.random$time$"0.025quant")
+  sr.uc <- exp(-mod5$summary.random$time$"0.975quant")
+  data.frame(time=grid.points.scaled1,sr.median=sr.median,sr.lc=sr.lc,sr.uc=sr.uc)
+}
+```
+
+Next, I load in the clock-like trees generated by LSD.
+
+```{r}
+lsd.dirs <- list.dirs("../lsd")
+lsd.dirs <- lsd.dirs[2:length(lsd.dirs)]
+stubs <- strsplit(lsd.dirs,"/") %>% lapply(.,"[",3) %>% unlist
+trees.fn <- paste(lsd.dirs,"/",stubs,"_result_newick_date.txt",sep="")
+numtrees <- length(trees.fn)
+trees <- list()
+for(i in 1:numtrees){
+  trees[[i]] <- read.tree(trees.fn[i])
+}
+```
+
+I loop through the trees and generate skyrides for each. Note how I omit tree number 3, which I can't get to converge with INLA.
+
+```{r}
+set.seed(1)
+srlist <- list()
+epsvec <- rep(0.0001,15)
+treevec <- c(1,2,4,5,6,7,8,9,10,11,12,13,14,15)
+for(i in treevec){
+  tr <- trees[[i]]
+  eps <- epsvec[i]
+  # The following is a hack to deal with repeated sample and coalescence times
+  tr$edge.length <- tr$edge.length+runif(length(tr$edge.length),-eps,eps)
+  # use tipdate.ci from phyext to calculate sample and coalescence times for heterochronous trees, as coalescent.intervals from ape doesn't work
+  sr <- calculate.heterochronous.skyride(tr)
+  srlist[[i]] <- sr
+}
+```
+
+I have to do some data processing to get a format palatable for ```ggplot2```.
+
+```{r}
+results <- srlist[[1]]
+results$Scenario <- stubs[treevec[1]]
+for(i in 2:length(treevec)){
+  tv <- treevec[i]
+  r <- srlist[[tv]]
+  r$Scenario <- stubs[tv]
+  results <- rbind(results,r)
+}
+```
+
+Now I can plot out the results...
+
+```{r}
+p <- ggplot(data=results,aes(x=time))+geom_line(aes(y=sr.median))+facet_wrap(~Scenario)+ylab(expression(N[e]))+xlab("Time since present")+scale_y_log10()+scale_x_reverse()+theme(strip.text.x=element_text(size = rel(0.6)))
+p
+```
+
+...as well as save them
+
+```{r}
+ggsave(filename="skyride.svg",plot=p,width=9,height=6)
+```
