@@ -1,0 +1,102 @@
+```{r}
+library(ape)
+library(magrittr)
+```
+
+
+```{r}
+seqdata.fn <- list.files(path="../sequences",pattern="fas",full.names=TRUE)
+numsc <- length(seqdata.fn)
+seqdata <- list()
+for(i in 1:numsc){
+    seqdata[[i]] <- read.dna(seqdata.fn[i],format="fasta",as.matrix=FALSE) # NB as.matrix=FALSE required for NEXUS output as below
+}
+```
+
+```{r}
+stubs <- rep("",numsc)
+for(i in 1:numsc){
+  stubs[i] <- seqdata.fn[i] %>% strsplit(.,"/") %>% unlist %>% tail(.,1) %>% strsplit(.,".",fixed=TRUE) %>% unlist %>% head(.,1)
+}
+```
+
+```{r}
+for(i in 1:numsc){
+  s <- seqdata[[i]]
+  ids <-  names(s) %>% strsplit(.,"\\-|\\|") %>% lapply(.,head,1) %>% unlist %>% as.character
+  ids <- gsub("IDPOP_","",ids,fixed=TRUE)
+  ids <- paste("X",ids,sep="")
+  names(s) <- ids
+  write.nexus.data(as.character(s),paste(stubs[i],".nex",sep=""),format="dna",interleaved=FALSE)
+}
+```
+
+```{r}
+villages.partition <- "
+   charset gag = 1-1479;
+   charset pol = 1480-4479;
+   charset env = 4480-6987;
+   partition villages = 3: gag, pol, env;
+   set partition = villages;
+"
+regional.partition <- "
+   charset gag = 1-1440;
+   charset pol = 1441-4284;
+   charset env = 4285-6807;
+   partition regional = 3: gag, pol, env;
+   set partition = regional;
+"
+partition.vec <- c(rep(regional.partition,3),rep(villages.partition,12))
+```
+
+```{r}
+strictclock <- "
+  set autoclose=yes;
+  lset applyto=(all) nst=6 rates=invgamma ngammacat=4;
+  prset statefreqpr=Dirichlet(1.0,1.0,1.0,1.0);
+  unlink statefreq=(all) revmat=(all) shape=(all) pinvar=(all);
+  prset applyto=(all) ratepr=variable;
+  prset topologypr=uniform;
+  prset brlenspr=clock:uniform;
+  prset clockratepr=lognorm(-9.0,1.0);
+  prset nodeagepr=calibrated;
+"
+clock.vec <- rep(strictclock,15)
+```
+
+```{r}
+calibrations.list <- list()
+for(i in 1:numsc){
+  s <- seqdata[[i]]
+  ids <-  names(s) %>% strsplit(.,"\\-|\\|") %>% lapply(.,head,1) %>% unlist %>% as.character
+  ids <- gsub("IDPOP_","",ids,fixed=TRUE)
+  ids <- paste("X",ids,sep="")
+  tipdates <- names(s) %>% strsplit(.,"_|\\|") %>% lapply(.,tail,1) %>% unlist %>% as.double
+  tipage <- -(tipdates-max(tipdates))
+  numseqs <- length(s)
+  mbblock <- rep("",numseqs)
+  for(j in 1:numseqs){
+    tipname <- ids[j]
+    #mbblock[j] <- paste("calibrate ",tipname,"=Uniform(",tipage[j],",",tipage[j],");",sep="")
+    mbblock[j] <- paste("calibrate ",tipname,"=fixed(",tipage[j],");",sep="")
+  }
+  mbblock <- paste(mbblock,collapse="\n")
+  calibrations.list[[i]] <- mbblock
+}
+```
+
+```{r}
+mcmcpars <- "
+mcmc ngen=1000000 nruns=2 nchains=2 samplefreq=1000;
+"
+mcmc.vec <- rep(mcmcpars,15)
+```
+
+```{r}
+for(i in 1:numsc){
+  myseqs.nex <- paste(readLines(paste(stubs[i],".nex",sep="")),collapse="\n")
+  myseqs.mb <- sprintf("begin mrbayes;\n%s%s%s%send;\n",partition.vec[i],clock.vec[i],calibrations.list[[i]],mcmc.vec[i])
+  cat(myseqs.nex,myseqs.mb,file=paste(stubs[i],"_mb_clock.nex",sep=""),sep="\n")
+}
+```
+
