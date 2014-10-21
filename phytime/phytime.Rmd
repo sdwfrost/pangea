@@ -1,0 +1,57 @@
+---
+title: "Phytime"
+author: "Simon Frost"
+date: "21/10/2014"
+output: html_document
+---
+
+```{r}
+library(ape)
+library(magrittr)
+```
+
+Load RAxML trees.
+
+```{r}
+trees.fn <- list.files("../raxmltrees","bestTree",full.names=TRUE)
+stubs <- trees.fn %>% strsplit(.,"/|\\.") %>% lapply(.,tail,1) %>% unlist
+numtrees <- length(trees.fn)
+raxmltrees <- list()
+for(i in 1:numtrees){
+  raxmltrees[[i]] <- read.tree(trees.fn[i])
+}
+```
+
+Need to rename sequences and trees, as per HyPhy.
+
+```{r}
+seqdata.fn <- list.files(path="../sequences",pattern="fas",full.names=TRUE)
+for(i in 1:numtrees){
+    s <- read.dna(seqdata.fn[i],format="fasta",as.matrix=TRUE)
+    newsname <- row.names(s) %>% strsplit(.,"\\-|\\|") %>% lapply(.,head,1) %>% gsub("IDPOP_","",.,fixed=TRUE) %>% paste("X",.,sep="")
+    row.names(s) <- newsname
+    write.dna(s,paste(stubs[i],".phy",sep=""),format="interleaved")
+}
+```
+
+```{r}
+for(i in 1:numtrees){
+  tr <- raxmltrees[[i]]
+  tn <- tr$tip.label
+  newtn <- tn %>% strsplit(.,"\\-|\\|") %>% lapply(.,head,1) %>% gsub("IDPOP_","",.,fixed=TRUE) %>% paste("X",.,sep="")
+  td <- tn %>% strsplit(.,"\\||_") %>% lapply(.,tail,1) %>% unlist %>% as.double
+  ta <- td-max(td)
+  calib <- paste(newtn," | ",ta, " ", ta,sep="")
+  write.table(calib,paste(stubs[i],"_calib.txt",sep=""),col.names=F,row.names=F,quote=F)
+  # now write out the tree
+  tr2 <- tr
+  tr2$tip.label <- newtn
+   if(!is.binary.tree(tr2)){
+    tr2 <- multi2di(tr2)
+  }
+  tr3 <- rtt(tr2,td,objective="rsquared")
+  write.tree(tr3,paste(stubs[i],"_raxml_rtt.tre",sep=""))
+}
+```
+
+
