@@ -39,10 +39,30 @@ for(i in 1:numtrees){
 ```
 
 ```{r}
-svg("mklrt.svg",width=9,height=5)
+svg("mklrt.svg",width=9,height=9)
+par(mar=c(20,5,2,1))
 ardll <- ardfitlist %>% lapply(.,logLik) %>% unlist
 symll <- symfitlist %>% lapply(.,logLik) %>% unlist
-barplot(ardll-symll,names=stubs,las=2)
+barplot(ardll-symll,names=stubs,las=2,ylab="Delta lnL",cex.lab=0.8)
 abline(h=2,lty=2)
 dev.off()
 ```
+
+
+```{r}
+malevec <- rep(0,numtrees)
+for(i in 1:numtrees){
+  tr <- trees[[i]]
+  states<-as.integer(grepl("\\|M\\||\\-MALE",tr$tip.label))
+  malevec[i] <- table(states)[2]/sum(table(states))
+}
+```
+
+```{r}
+svg("propmales.svg",width=9,height=9)
+par(mar=c(20,5,2,1))
+barplot(malevec,names=stubs,las=2,ylab="Proportion males",cex.lab=0.8,ylim=c(0.4,0.6))
+abline(h=0.5,lty=2)
+dev.off()
+```
+
