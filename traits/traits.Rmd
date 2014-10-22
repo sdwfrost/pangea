@@ -61,7 +61,7 @@ for(i in 1:numtrees){
 ```{r}
 svg("propmales.svg",width=9,height=9)
 par(mar=c(20,5,2,1))
-barplot(malevec,names=stubs,las=2,ylab="Proportion males",cex.lab=0.8,ylim=c(0.4,0.6))
+barplot(malevec,names=stubs,las=2,ylab="Proportion males",cex.lab=0.8,ylim=c(0.4,0.6),xpd=FALSE)
 abline(h=0.5,lty=2)
 dev.off()
 ```
