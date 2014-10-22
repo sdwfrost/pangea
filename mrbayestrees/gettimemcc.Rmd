@@ -1,0 +1,54 @@
+---
+title: "Get MCC trees"
+author: "Simon Frost"
+date: "21/10/2014"
+output: html_document
+---
+
+```{r}
+library(ape)
+```
+
+
+```{r}
+getmcc <- function(heights,burnin,limit,input,output,prog){
+  mcc <- sprintf("%s -heights %s -burnin %i -limit %f %s %s ",prog,heights,as.integer(burnin),as.double(limit),input,output)
+  mcc
+}
+```
+
+```{r}
+tr.fn <- list.files("./",pattern="\\.t$")
+p.fn <- list.files("./",pattern="\\.p$")
+numtreefiles <- length(tr.fn)
+burnin <- 101
+```
+
+```{r}
+for(i in 1:numtreefiles){
+  print(i)
+  trees <- read.nexus(tr.fn[i])
+  params <- read.table(p.fn[i],header=T,row.names=NULL,skip=1,sep="\t")
+  clocktrees <- trees
+  for(j in 1:length(clocktrees)){
+    clocktrees[[j]]$edge.length <- clocktrees[[j]]$edge.length/params$Clockrate.all.[j]
+  }
+  write.nexus(clocktrees[(burnin+1):length(clocktrees)],file=paste(tr.fn[i],".time",sep=""))
+}
+```
+
+```{r}
+for(i in 1:numtreefiles){
+  print(i)
+  cmd <- getmcc("keep",0,0.0,paste(tr.fn[i],".time",sep=""),paste(tr.fn[i],".time.mcc",sep=""),"/home/simon/Programs/BEASTv1.8.1/bin/treeannotator")
+  system(cmd)
+}
+```
+
+```{r}
+for(i in 1:numtreefiles){
+  tr <- read.nexus(paste(tr.fn[i],".time.mcc",sep=""))
+  write.tree(tr,paste(paste(tr.fn[i],".time.mcc",sep=""),".tre",sep=""))
+}
+```
+
