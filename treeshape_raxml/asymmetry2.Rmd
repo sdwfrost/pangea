@@ -1,0 +1,108 @@
+```{r}
+library(ape)
+library(magrittr)
+library(ggplot2)
+library(treeImbalance)
+```
+
+I load in the RAxML trees.
+
+```{r}
+trees.fn <- list.files("../raxmltrees","bestTree",full.names=TRUE)
+stubs <- trees.fn %>% strsplit(.,"/|\\.") %>% lapply(.,tail,1) %>% unlist
+numtrees <- length(trees.fn)
+raxmltrees <- list()
+for(i in 1:numtrees){
+  raxmltrees[[i]] <- read.tree(trees.fn[i])
+}
+```
+
+Now I root the trees using rtt.
+
+```{r}
+trees <- list()
+for(i in 1:numtrees){
+  tr <- raxmltrees[[i]]
+  td <- tr$tip.label %>% strsplit(.,"\\||\\_") %>% lapply(.,tail,1) %>% unlist %>% as.double
+  tr2 <- rtt(tr,td,objective="rsquared")
+  trees[[i]] <- tr2
+}
+```
+
+
+```{r}
+globalstat <- function(s){
+  tail(s[[2]],1)
+}
+```
+
+```{r}
+nsims <- 1000
+s.vec <- rep(0,numtrees)
+ch.vec <- rep(0,numtrees)
+snull.list <- list()
+chnull.list <- list()
+for(i in 1:numtrees){
+  print(paste(i,"/",numtrees))
+  tr <- trees[[i]]
+  s <- snt(tr)
+  ch <- ct(tr)
+  tr.s <- globalstat(s)
+  tr.ch <- globalstat(ch)
+  s.vec[i] <- tr.s
+  ch.vec[i] <- tr.ch
+  snull <- rep(0,nsims)
+  chnull <- rep(0,nsims)
+  for(j in 1:nsims){
+    trp <- getSimTree(tr)
+    sp <- snt(trp)
+    chp <- ct(trp)
+    snull[j] <- globalstat(sp)
+    chnull[j] <- globalstat(chp)
+  }
+  snull.list[[i]] <- snull
+  chnull.list[[i]] <- chnull
+}
+```
+
+```{r}
+svg("sackins_raxmlrtt.svg",width=9,height=15)
+par(mfrow=c(5,3))
+for(i in 1:numtrees){
+  alls <- c(snull.list[[i]],s.vec[i])
+  hist(snull.list[[i]],breaks=100,xlim=c(min(alls),max(alls)),main=stubs[i],xlab="Sackin's index")
+  abline(v=s.vec[i],col="red")
+}
+dev.off()
+```
+
+
+```{r}
+svg("cherries_raxmlrtt.svg",width=9,height=15)
+par(mfrow=c(5,3))
+for(i in 1:15){
+  allch <- c(chnull.list[[i]],ch.vec[i])
+  hist(chnull.list[[i]],breaks=100,xlim=c(min(allch),max(allch)),main=stubs[i],xlab="Cherries")
+  abline(v=ch.vec[i],col="red")
+}
+dev.off()
+```
+
+```{r}
+sackins.p <- rep(-1,15)
+cherries.p <- rep(-1,15)
+for(i in 1:15){
+  sackins.p[i] <- sum(as.integer(snull.list[[i]])>=s.vec[i])/nsims
+  cherries.p[i] <- sum(as.integer(chnull.list[[i]])<=ch.vec[i])/nsims
+}
+```
+
+```{r}
+pval.df <- data.frame(Scenario=stubs,Sackins.p=sackins.p,Cherries.p=cherries.p)
+```
+
+```{r}
+library(SortableHTMLTables)
+sortable.html.table(pval.df,"pvalues.html")
+```
+
