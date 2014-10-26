@@ -26,6 +26,19 @@ for(i in 1:numsc){
   ids <-  names(s) %>% strsplit(.,"\\-|\\|") %>% lapply(.,head,1) %>% unlist %>% as.character
   ids <- gsub("IDPOP_","",ids,fixed=TRUE)
   ids <- paste("X",ids,sep="")
+  st <- names(s) %>% strsplit(.,"_|\\|") %>% lapply(.,tail,1) %>% unlist %>% as.double
+  mf <- names(s) %>% grepl("\\-MALE|\\M\\|",.)
+  d <- data.frame(id=names(s),newid=ids,sampletime=st,male=mf)
+  write.table(d,paste(stubs[i],"_annotations.txt",sep=""),col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
+}
+```
+
+```{r}
+for(i in 1:numsc){
+  s <- seqdata[[i]]
+  ids <-  names(s) %>% strsplit(.,"\\-|\\|") %>% lapply(.,head,1) %>% unlist %>% as.character
+  ids <- gsub("IDPOP_","",ids,fixed=TRUE)
+  ids <- paste("X",ids,sep="")
   names(s) <- ids
   write.nexus.data(as.character(s),paste(stubs[i],".nex",sep=""),format="dna",interleaved=FALSE)
 }
