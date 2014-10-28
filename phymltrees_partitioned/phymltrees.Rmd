@@ -26,9 +26,9 @@ phyxml <- sprintf('
   </ratematrices>
 
   <equfreqs id="EF1">
-    <instance id="F1" optimise.freq="yes"/>
-    <instance id="F2" optimise.freq="yes"/>
-    <instance id="F3" optimise.freq="yes"/>
+    <instance id="F1" optimise.freqs="yes"/>
+    <instance id="F2" optimise.freqs="yes"/>
+    <instance id="F3" optimise.freqs="yes"/>
   </equfreqs>
 
   <siterates id="SR1">
