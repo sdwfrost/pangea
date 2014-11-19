@@ -1,0 +1,25 @@
+LEAST-SQUARE METHODS TO ESTIMATE RATES AND DATES - 0.1 
+
+
+Input files:
+  I                                 Input tree file : 281014_Village_scA_sample1_epi1.fasta.ft
+  D                                 Input date file : 281014_Village_scA_sample1_epi1.fasta.td
+Output file:
+  O                                    Output file  : 281014_Village_scA_sample1_epi1.fasta_result.txt
+Parameters:
+  S                                 Sequence Length : 6987
+  C                                With constraints : Yes
+  T                        Lower bound for the rate : 0.000010
+  V                                  With variances : Yes
+  B                          Parameter of variances : 10.000000
+  R                               Estimate the root : Yes
+  W                         Given substitution rate : No
+  G                                Remove outgroups : No
+  N                               Multiple data set : No
+
+  H to print Help 
+  Y to accept or type a letter to change an option (Q = Exit) 
+Tree 1 rate 0.002557 tMRCA 5.863490 objective_function 0.148493
+
+*********************************************************
+Elapsed time: 0.86 seconds

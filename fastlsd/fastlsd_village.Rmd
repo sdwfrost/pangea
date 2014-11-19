@@ -1,0 +1,42 @@
+```{r}
+library(ape)
+library(magrittr)
+```
+
+```{r}
+timetree <- function(seqfn,stub,fasttree="FastTreeMP",fasttreeopts="-quiet -nopr -nosupport -gamma -nt -gtr "){
+  # get sequence length
+  s <- read.dna(seqfn,format="fasta",as.matrix=FALSE)
+  seqlen <- length(s[[1]])
+  # tip names
+  tn <- names(s)
+  # number of sequences
+  numseq <- length(tn)
+  # tip dates
+  td <- strsplit(tn,"_",fixed=TRUE) %>% lapply(.,tail,1) %>% as.double %>% unlist
+  # run fasttree
+  ft.cmd <- sprintf("%s %s %s",fasttree,fasttreeopts,seqfn)
+  ft.txt <- paste(system(ft.cmd,intern=TRUE),collapse="\n")
+  # read in tree and make bifurcating
+  ft.tre <- read.tree(text=gsub("\n","",ft.txt))
+  ft.tre.bi <- unroot(multi2di(ft.tre))
+  # write tipdates 
+  write.table(rbind(c(length(tn),""),cbind(tn,td)),paste(stub,".td",sep=""),col.names=FALSE,row.names=FALSE,quote=FALSE)
+  # write out tree
+  write.tree(ft.tre.bi,paste(stub,".ft",sep=""))
+  # use lsd
+  lsd.cmd <- sprintf("lsd -i %s -d %s -c -n 1 -r -b %s -s %s -v",paste(stub,".ft",sep=""),paste(stub,".td",sep=""),paste(10),paste(seqlen))
+  lsd <- system(lsd.cmd,intern=TRUE)
+}
+```
+
+```{r}
+village.files <- list.files("../sequences",pattern=".fasta",full.names=TRUE)
+for(i in 1:length(village.files)){
+  print(i)
+  seqfn <- village.files[i]
+  stub <- strsplit(seqfn,"/",fixed=TRUE)[[1]] %>% tail(.,1) %>% gsub(".fasta","",.,fixed=TRUE)
+  timetree(seqfn,stub)
+}
+```
+
