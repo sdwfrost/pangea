@@ -1,0 +1,50 @@
+---
+title: "Process LSD"
+author: "Simon D.W. Frost"
+date: "20 November 2014"
+output: html_document
+---
+
+```{r}
+library(magrittr)
+```
+
+
+```{r}
+result.files <- as.list(list.files(path=".",pattern="*_result.txt"))
+stubs <- lapply(result.files,strsplit,"_result.txt") %>% lapply(.,"[",1) %>% unlist
+nresults <- length(result.files)
+```
+
+```{r}
+procresult <- function(fn){
+  result <- readLines(fn)
+  line <- result[grep("Tree 1 rate ",result)]
+  line.split <- strsplit(line, " ")[[1]]
+  list(rate=as.double(line.split[4]),tmrca=as.double(line.split[6]))
+}
+```
+
+```{r}
+results <- lapply(result.files,procresult)
+rates <- lapply(results,"[","rate") %>% unlist %>% unname
+village.rates <- rates[grep("Village",stubs)]
+regional.rates <- rates[grep("HPTN",stubs)]
+```
+
+```{r}
+#svg("village_rates.svg",width=8,height=6)
+hist(village.rates)
+#dev.off()
+```
+
+```{r}
+#svg("regional_rates.svg",width=8,height=6)
+hist(regional.rates)
+#dev.off()
+```
+
+
+
+
+
