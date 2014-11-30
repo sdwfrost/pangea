@@ -38,8 +38,8 @@ crs <- lapply(plist,"[","Clockrate.all.") %>% lapply(.,head,-101) %>% lapply(.,u
 
 ```{r, fig.width=8,fig.height=12}
 cr <- lapply(crs,"[",2) %>% unlist %>% unname
-par(mar=c(5,20,2,2))
 #svg("clockrates.svg",width=8,height=12)
+par(mar=c(5,20,2,2))
 boxplot(cr~seq(1,numpfiles),names=stubs,horizontal=TRUE,las=1,ylim=c(0.001,0.012),xlab="Rate")
 #dev.off()
 ```
