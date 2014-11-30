@@ -1,0 +1,47 @@
+---
+title: "Clock rates"
+author: "Simon Frost"
+date: "30 November 2014"
+output: html_document
+---
+
+```{r}
+library(magrittr)
+```
+
+
+```{r}
+p.fn <- list.files("./",pattern="\\.p$")
+numpfiles <- length(p.fn)
+stubs <- strsplit(p.fn,"_mb") %>% lapply(.,"[",1) %>% unlist
+```
+
+```{r}
+plist <- list()
+for(i in 1:numpfiles){
+  #print(i)
+  params <- read.table(p.fn[i],header=T,row.names=NULL,skip=1,sep="\t")
+  plist[[i]] <- params
+}
+```
+
+```{r,eval=FALSE,echo=FALSE}
+for(i in 1:numpfiles){
+  p <- plist[[i]]
+  plot(p$LnL~p$Gen,xlab="Iteration",ylab="lnL",main=stubs[i])
+}
+```
+
+```{r}
+crs <- lapply(plist,"[","Clockrate.all.") %>% lapply(.,head,-101) %>% lapply(.,unlist) %>% lapply(.,unname) %>% lapply(.,quantile,c(0.025,0.5,0.975))
+```
+
+```{r, fig.width=8,fig.height=12}
+cr <- lapply(crs,"[",2) %>% unlist %>% unname
+par(mar=c(5,20,2,2))
+boxplot(cr~seq(1,numpfiles),names=stubs,horizontal=TRUE,las=1,ylim=c(0.001,0.012),xlab="Rate")
+```
+
+
+
+
