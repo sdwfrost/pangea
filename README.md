@@ -1,5 +1,6 @@
 pangea
 ======
+[![Gitter](https://badges.gitter.im/Join Chat.svg)](https://gitter.im/sdwfrost/pangea?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 This is a repository of analyses for the PANGEA-HIV Phylodynamics Methods Comparison exercise. Datasets and instructions can be found [here](http://bit.ly/PANGEAHIVsim). The intention of this repository is to generate trees, evolutionary rates, *etc.*, so that more interesting things can be addressed in the (mere!) month for the first set of analyses to be completed.
 
